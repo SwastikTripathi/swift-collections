@@ -39,7 +39,8 @@ extension ContainerIterator where Base.Element: ~Copyable {
   public func filter(
     _ isIncluded: @escaping (borrowing Element) -> Bool
   ) -> ContainerFilter<Base> {
-    ContainerFilter<Base>(_base: _base, index: _position, isIncluded: isIncluded)
+    ContainerFilter<Base>(
+      _base: _base, index: _position, end: _end, isIncluded: isIncluded)
   }
 }
 
@@ -61,6 +62,9 @@ where Base.Element: ~Copyable
   public var _position: Base.Index
 
   @_alwaysEmitIntoClient
+  public let _end: Base.Index
+
+  @_alwaysEmitIntoClient
   public var _remainder: Span<Element>
 
   @_alwaysEmitIntoClient
@@ -68,11 +72,13 @@ where Base.Element: ~Copyable
   internal init(
     _base: Ref<Base>,
     index: Base.Index,
+    end: Base.Index,
     isIncluded: @escaping (borrowing Element) -> Bool
   ) {
     self._isIncluded = isIncluded
     self._base = _base
     self._position = index
+    self._end = end
     self._remainder = .init()
   }
 
@@ -85,6 +91,7 @@ where Base.Element: ~Copyable
     self._isIncluded = isIncluded
     self._base = Ref(_base)
     self._position = _base.startIndex
+    self._end = _base.endIndex
     self._remainder = .init()
   }
 }
@@ -111,7 +118,7 @@ extension ContainerFilter: BorrowingIteratorProtocol where Element: ~Copyable {
         }
         return _remainder._trim(first: i)
       }
-      _remainder = _base.value.nextSpan(after: &_position)
+      _remainder = _base.value.nextSpan(after: &_position, limitedBy: _end)
       if _remainder.isEmpty { return .init() }
     }
   }
