@@ -254,6 +254,24 @@ final class BitSetCountedTests: CollectionTestCase {
     expectFalse(a.isStrictSubset(of: Set(c)))
   }
 
+  func test_range_predicates_with_more_than_Int_max_values() {
+    // `Range<Int>.count` traps for these ranges.
+    let bits: BitSet.Counted = [0, 1, 2]
+    let plain = BitSet(bits)
+    let huge = [-1 ..< Int.max, Int.min ..< 3, Int.min ..< Int.max]
+    for range in huge {
+      expectEqual(
+        bits.isEqualSet(to: range), plain.isEqualSet(to: range),
+        "\(range)")
+      expectEqual(
+        bits.isStrictSubset(of: range), plain.isStrictSubset(of: range),
+        "\(range)")
+    }
+    expectFalse(bits.isEqualSet(to: -1 ..< Int.max))
+    expectTrue(bits.isStrictSubset(of: Int.min ..< 3))
+    expectFalse(bits.isStrictSubset(of: Int.min ..< 2))
+  }
+
   func test_isStrictSuperset() {
     let a: BitSet.Counted = [1, 2, 3, 4]
 

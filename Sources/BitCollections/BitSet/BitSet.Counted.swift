@@ -922,7 +922,11 @@ extension BitSet.Counted {
   /// - Complexity: O(min(*max*, `other.upperBound`), where *max* is the largest
   ///    member of `self`.
   public func isEqualSet(to other: Range<Int>) -> Bool {
-    guard self.count == other.count else { return false }
+    // `other.count` traps when the range holds more than `Int.max` values;
+    // no bit set is that large.
+    let (otherCount, overflow) = other.upperBound.subtractingReportingOverflow(
+      other.lowerBound)
+    guard !overflow, self.count == otherCount else { return false }
     return _bits.isEqualSet(to: other)
   }
 
@@ -1171,7 +1175,11 @@ extension BitSet.Counted {
   ///
   /// - Complexity: O(*max*), where *max* is the largest item in `self`.
   public func isStrictSubset(of other: Range<Int>) -> Bool {
-    guard self.count < other.count else { return false }
+    // `other.count` traps when the range holds more than `Int.max` values,
+    // which is more than any bit set has.
+    let (otherCount, overflow) = other.upperBound.subtractingReportingOverflow(
+      other.lowerBound)
+    guard overflow || self.count < otherCount else { return false }
     return _bits.isStrictSubset(of: other)
   }
 
