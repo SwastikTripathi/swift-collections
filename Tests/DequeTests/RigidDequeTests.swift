@@ -1834,4 +1834,59 @@ final class RigidDequeTests: CollectionTestCase {
     }
   }
 #endif
+
+#if compiler(>=6.4)
+  @available(SwiftStdlib 6.4, *)
+  func test_prepend_copying_throwingIterable_keepsItemsAtFront() {
+    // https://github.com/apple/swift-collections/issues/867
+    withEvery("existing", in: [0, 1, 3]) { existing in
+      withEvery("startSlot", in: 0 ..< 6) { startSlot in
+        withEvery("throwAfter", in: 0 ... 3) { throwAfter in
+          withLifetimeTracking { tracker in
+            // Fill the capacity exactly on the largest case, so the final
+            // `nextSpan` call is the one that throws.
+            var d = RigidDeque<LifetimeTracked<Int>>(capacity: 6)
+            // Shift the start slot so the storage wraps around.
+            for _ in 0 ..< startSlot { d.append(tracker.instance(for: -1)) }
+            for _ in 0 ..< startSlot { _ = d.removeFirst() }
+            for i in 0 ..< existing { d.append(tracker.instance(for: 100 + i)) }
+            let source = _ThrowingDequeTestIterable(
+              items: (0 ..< throwAfter).map { tracker.instance(for: $0) })
+            do {
+              try d.prepend(copying: source)
+              expectFailure("prepend(copying:) should have thrown")
+            } catch {}
+            expectEqual(
+              (0 ..< d.count).map { d[$0].payload },
+              Array(0 ..< throwAfter) + Array(100 ..< 100 + existing))
+          }
+        }
+      }
+    }
+  }
+#endif
 }
+
+#if compiler(>=6.4)
+/// An `Iterable` that hands out its items one at a time, then throws.
+@available(SwiftStdlib 6.4, *)
+internal struct _ThrowingDequeTestIterable<Element>: Iterable {
+  struct Failure: Error {}
+
+  var items: [Element]
+
+  func makeBorrowingIterator() -> Iterator { Iterator(items: items) }
+
+  struct Iterator: BorrowingIteratorProtocol {
+    var items: [Element]
+    var offset = 0
+
+    @_lifetime(&self)
+    mutating func nextSpan(maxCount: Int) throws(Failure) -> Span<Element> {
+      guard offset < items.count else { throw Failure() }
+      offset += 1
+      return items.span.extracting(offset - 1 ..< offset)
+    }
+  }
+}
+#endif

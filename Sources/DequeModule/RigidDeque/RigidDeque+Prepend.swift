@@ -265,8 +265,10 @@ extension RigidDeque /*where Element: Copyable*/ {
     // them in place. Append them to the end of the deque first, then rotate
     // them to their correct location.
     let oldCount = self.count
+    // Rotate on the error path too, so the items the source handed out
+    // before it threw still end up at the front.
+    defer { unsafe _handle.rotate(toStartAtOffset: oldCount) }
     try self._append(copying: items) // Not a typo!
-    unsafe _handle.rotate(toStartAtOffset: oldCount)
   }
 
   @available(SwiftStdlib 6.4, *)

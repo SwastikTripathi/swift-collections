@@ -818,4 +818,30 @@ final class UniqueDequeTests: CollectionTestCase {
   }
 #endif
 
+
+#if compiler(>=6.4)
+  @available(SwiftStdlib 6.4, *)
+  func test_prepend_copying_throwingIterable_keepsItemsAtFront() {
+    // https://github.com/apple/swift-collections/issues/867
+    withEvery("capacity", in: [0, 2, 8]) { capacity in
+      withEvery("existing", in: [0, 1, 2]) { existing in
+        withEvery("throwAfter", in: 0 ... 3) { throwAfter in
+          withLifetimeTracking { tracker in
+            var d = UniqueDeque<LifetimeTracked<Int>>(capacity: capacity)
+            for i in 0 ..< existing { d.append(tracker.instance(for: 100 + i)) }
+            let source = _ThrowingDequeTestIterable(
+              items: (0 ..< throwAfter).map { tracker.instance(for: $0) })
+            do {
+              try d.prepend(copying: source)
+              expectFailure("prepend(copying:) should have thrown")
+            } catch {}
+            expectEqual(
+              (0 ..< d.count).map { d[$0].payload },
+              Array(0 ..< throwAfter) + Array(100 ..< 100 + existing))
+          }
+        }
+      }
+    }
+  }
+#endif
 }
